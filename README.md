@@ -116,13 +116,37 @@ Use the returned token as `Authorization: Bearer <token>` for protected API requ
 
 ## Kubernetes
 
-Build and load `arunodhai/tasklane-api:latest` and `arunodhai/tasklane-web:latest` into Minikube, change the demo secrets in `deployment/kubernetes/tasklane.yml`, then run:
+Start a Docker-backed Minikube cluster and build both application images directly into its container runtime:
+
+```bash
+minikube start --driver=docker
+minikube image build -t arunodhai/tasklane-api:latest backend
+minikube image build -t arunodhai/tasklane-web:latest frontend
+```
+
+Apply the resources and wait for MongoDB, the API, and the web application to become ready:
 
 ```bash
 kubectl apply -f deployment/kubernetes/tasklane.yml
-kubectl get pods
-minikube service tasklane-web
+kubectl rollout status deployment/tasklane-mongodb --timeout=300s
+kubectl rollout status deployment/tasklane-api --timeout=300s
+kubectl rollout status deployment/tasklane-web --timeout=300s
+kubectl get deployments,pods,services,pvc
 ```
+
+Open a local tunnel to the NodePort service:
+
+```bash
+minikube service tasklane-web --url
+```
+
+With the Docker driver on macOS, keep that terminal open while using the printed URL. Stop the cluster without deleting its data with:
+
+```bash
+minikube stop
+```
+
+The credentials in `deployment/kubernetes/tasklane.yml` are for local demonstrations only. Replace them before using the manifest in a shared environment.
 
 ## Verification
 
