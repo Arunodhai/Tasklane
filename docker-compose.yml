@@ -1,0 +1,46 @@
+services:
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - tasklane-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/tasklane
+      JWT_SECRET: ${JWT_SECRET:-tasklane-compose-demo-secret-change-before-production-2026}
+      DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-admin@tasklane.local}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-Admin@123}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL:-demo@tasklane.local}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-Demo@123}
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  tasklane-data:

@@ -1,0 +1,168 @@
+<div *ngIf="!authReady" class="app-loading" aria-label="Loading Tasklane"><span></span></div>
+
+<main *ngIf="authReady && !currentUser" class="auth-shell">
+  <section class="auth-intro">
+    <div class="auth-brand"><span class="brand-mark">T</span><strong>Tasklane</strong></div>
+    <p class="eyebrow">Work management, simplified</p>
+    <h1>Make progress visible.</h1>
+    <p>Plan focused work, track delivery, and keep your team aligned in one quiet workspace.</p>
+    <div class="auth-proof" aria-label="Product benefits">
+      <span><i></i>Clear ownership</span>
+      <span><i></i>Focused task views</span>
+      <span><i></i>Secure team access</span>
+    </div>
+  </section>
+
+  <section class="auth-card" aria-labelledby="auth-title">
+    <div class="auth-tabs" role="tablist" aria-label="Account access">
+      <button type="button" role="tab" [attr.aria-selected]="authMode === 'login'" [class.active]="authMode === 'login'" (click)="switchAuthMode('login')">Sign in</button>
+      <button type="button" role="tab" [attr.aria-selected]="authMode === 'register'" [class.active]="authMode === 'register'" (click)="switchAuthMode('register')">Create account</button>
+    </div>
+    <div class="auth-heading">
+      <p class="eyebrow">{{ authMode === 'login' ? 'Welcome back' : 'Start your workspace' }}</p>
+      <h2 id="auth-title">{{ authMode === 'login' ? 'Sign in to Tasklane' : 'Create your account' }}</h2>
+    </div>
+    <form (ngSubmit)="submitAuth()">
+      <label *ngIf="authMode === 'register'"><span>Full name</span><input name="fullName" [(ngModel)]="authForm.fullName" autocomplete="name" maxlength="80" placeholder="Your name" required></label>
+      <label><span>Email address</span><input name="email" type="email" [(ngModel)]="authForm.email" autocomplete="email" placeholder="you@company.com" required></label>
+      <label><span>Password</span><span class="password-field"><input name="password" [type]="showPassword ? 'text' : 'password'" [(ngModel)]="authForm.password" [autocomplete]="authMode === 'login' ? 'current-password' : 'new-password'" minlength="8" placeholder="At least 8 characters" required><button type="button" (click)="showPassword = !showPassword">{{ showPassword ? 'Hide' : 'Show' }}</button></span></label>
+      <p *ngIf="authError" class="auth-error" role="alert">{{ authError }}</p>
+      <button type="submit" class="primary-button auth-submit" [disabled]="authSubmitting">{{ authSubmitting ? 'Please wait...' : (authMode === 'login' ? 'Sign in' : 'Create account') }}</button>
+    </form>
+    <p class="auth-switch">{{ authMode === 'login' ? 'New to Tasklane?' : 'Already have an account?' }} <button type="button" (click)="switchAuthMode(authMode === 'login' ? 'register' : 'login')">{{ authMode === 'login' ? 'Create account' : 'Sign in' }}</button></p>
+  </section>
+</main>
+
+<div *ngIf="authReady && currentUser" class="app-shell">
+  <header class="global-header">
+    <div class="brand"><span class="brand-mark">T</span><div><strong>Tasklane</strong><small>Work management</small></div></div>
+    <nav aria-label="Primary navigation">
+      <button type="button" [class.active]="activeSection === 'dashboard'" (click)="selectSection('dashboard')"><span class="nav-mark dashboard-mark" aria-hidden="true"></span>Dashboard</button>
+      <button type="button" [class.active]="activeSection === 'tasks'" (click)="selectSection('tasks')"><span class="nav-mark tasks-mark" aria-hidden="true"></span>Tasks<span class="nav-count">{{ tasks.length }}</span></button>
+      <button *ngIf="isAdmin" type="button" [class.active]="activeSection === 'admin'" (click)="selectSection('admin')"><span class="nav-mark admin-mark" aria-hidden="true"></span>Access</button>
+    </nav>
+    <div class="profile">
+      <div class="profile-avatar">{{ profileInitials }}</div>
+      <div class="profile-copy"><strong>{{ currentUser.fullName }}</strong><small>{{ isAdmin ? 'Workspace admin' : 'Team member' }}</small></div>
+      <button type="button" class="sign-out" title="Sign out" (click)="logout()">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">{{ activeSection === 'dashboard' ? 'Today in Tasklane' : activeSection === 'tasks' ? (isAdmin ? 'Workspace planning' : 'My workspace') : 'Access control' }}</p>
+        <h1>{{ activeSection === 'dashboard' ? 'Your work, at a glance.' : activeSection === 'tasks' ? 'Plan and deliver' : 'Team and access' }}</h1>
+      </div>
+      <button *ngIf="activeSection !== 'admin'" type="button" class="primary-button" (click)="openCreate()"><span aria-hidden="true">+</span> New task</button>
+    </header>
+
+    <div class="content">
+      <div *ngIf="errorMessage" class="error-banner" role="alert"><span>{{ errorMessage }}</span><button type="button" (click)="loadTasks()">Try again</button></div>
+
+      <ng-container *ngIf="activeSection === 'dashboard'">
+        <section class="daily-brief">
+          <div><span class="brief-icon" aria-hidden="true"></span><div><p class="eyebrow">Daily brief</p><h2>{{ dueTodayCount ? dueTodayCount + ' task' + (dueTodayCount === 1 ? '' : 's') + ' due today' : 'Nothing is due today' }}</h2><p>{{ overdueCount ? overdueCount + ' overdue item' + (overdueCount === 1 ? '' : 's') + ' needs attention.' : 'You are clear of overdue work.' }}</p></div></div>
+          <button type="button" class="secondary-button" (click)="showDue('TODAY')">Review today</button>
+        </section>
+        <section class="summary-strip" aria-label="Workspace summary">
+          <button type="button" (click)="selectSection('tasks')"><span>Open work</span><strong>{{ todoCount + inProgressCount }}</strong><small>{{ openStoryPoints ? openStoryPoints + ' story points' : 'No points estimated' }}</small></button>
+          <button type="button" (click)="statusFilter = 'IN_PROGRESS'; selectSection('tasks')"><span>In progress</span><strong>{{ inProgressCount }}</strong><small>Currently active</small></button>
+          <button type="button" (click)="priorityFilter = 'HIGH'; selectSection('tasks')"><span>High priority</span><strong>{{ highPriorityOpenCount }}</strong><small>Open and important</small></button>
+          <button type="button" (click)="statusFilter = 'DONE'; selectSection('tasks')"><span>Completion</span><strong>{{ completionPercentage }}%</strong><small>{{ doneCount }} of {{ tasks.length }} delivered</small></button>
+        </section>
+        <section class="dashboard-primary">
+          <div class="my-day-panel">
+            <div class="section-heading"><div><p class="eyebrow">Next up</p><h2>My day</h2></div><button type="button" class="text-button" (click)="showDue('WEEK')">See this week</button></div>
+            <div *ngIf="dueSoonTasks.length === 0" class="empty-compact">No upcoming deadlines. Add a due date to plan your week.</div>
+            <article class="day-task" *ngFor="let task of dueSoonTasks; trackBy: trackTask">
+              <button type="button" class="complete-toggle" [class.done]="task.status === 'DONE'" [attr.aria-label]="'Mark ' + task.title + ' complete'" (click)="moveTask(task, 'DONE')"></button>
+              <button type="button" class="day-task-copy" (click)="openEdit(task)"><strong>{{ task.title }}</strong><small>{{ task.project }}<span *ngIf="task.storyPoints"> · {{ task.storyPoints }} pts</span></small></button>
+              <span class="priority-label" [class]="task.priority.toLowerCase()"><i></i>{{ priorityLabel(task.priority) }}</span>
+              <time [class.overdue]="isOverdue(task)">{{ dueLabel(task) }}</time>
+            </article>
+          </div>
+          <aside class="progress-panel redesigned-progress">
+            <div><p class="eyebrow">Overall progress</p><h2>{{ isAdmin ? 'Workspace delivery' : 'Your delivery' }}</h2></div>
+            <div class="progress-ring" [style.--progress]="completionPercentage * 3.6 + 'deg'"><div><strong>{{ completionPercentage }}%</strong><small>complete</small></div></div>
+            <div class="progress-legend"><span><i class="dot todo-dot"></i>To do <strong>{{ todoCount }}</strong></span><span><i class="dot progress-dot"></i>In progress <strong>{{ inProgressCount }}</strong></span><span><i class="dot done-dot"></i>Done <strong>{{ doneCount }}</strong></span></div>
+          </aside>
+        </section>
+        <section class="dashboard-secondary">
+          <div class="project-panel">
+            <div class="section-heading"><div><p class="eyebrow">Portfolio</p><h2>Project progress</h2></div><span>{{ projects.length }} projects</span></div>
+            <button type="button" class="project-row" *ngFor="let project of projectSummaries" (click)="projectFilter = project.name; selectSection('tasks')"><span><strong>{{ project.name }}</strong><small>{{ project.done }} of {{ project.total }} complete</small></span><i><b [style.width.%]="project.percent"></b></i><em>{{ project.percent }}%</em></button>
+            <div *ngIf="projectSummaries.length === 0" class="empty-compact">Projects appear here when tasks are created.</div>
+          </div>
+          <div class="recent-panel">
+            <div class="section-heading"><div><p class="eyebrow">Activity</p><h2>Recently updated</h2></div></div>
+            <button type="button" class="recent-task" *ngFor="let task of recentlyUpdatedTasks; trackBy: trackTask" (click)="openEdit(task)"><i [class]="task.status.toLowerCase()"></i><span><strong>{{ task.title }}</strong><small>{{ statusLabel(task.status) }} · {{ task.project }}</small></span><time>{{ task.updatedAt | date:'MMM d' }}</time></button>
+          </div>
+        </section>
+      </ng-container>
+
+      <ng-container *ngIf="activeSection === 'tasks'">
+        <section class="task-overview">
+          <div><strong>{{ filteredTasks.length }}</strong><span>visible tasks</span></div>
+          <div class="quick-filters" aria-label="Quick due date filters"><button type="button" [class.active]="dueFilter === 'ALL'" (click)="dueFilter = 'ALL'">All</button><button type="button" [class.active]="dueFilter === 'TODAY'" (click)="dueFilter = 'TODAY'">Today <span>{{ dueTodayCount }}</span></button><button type="button" [class.active]="dueFilter === 'WEEK'" (click)="dueFilter = 'WEEK'">This week</button><button type="button" [class.active]="dueFilter === 'OVERDUE'" (click)="dueFilter = 'OVERDUE'">Overdue <span>{{ overdueCount }}</span></button></div>
+        </section>
+        <section class="task-toolbar" aria-label="Task filters">
+          <label class="search-field"><span class="visually-hidden">Search tasks</span><input type="search" [(ngModel)]="searchTerm" placeholder="Search tasks, projects, or labels"></label>
+          <select [(ngModel)]="projectFilter" aria-label="Filter by project"><option value="ALL">All projects</option><option *ngFor="let project of projects" [value]="project">{{ project }}</option></select>
+          <select [(ngModel)]="priorityFilter" aria-label="Filter by priority"><option value="ALL">All priorities</option><option value="HIGH">High priority</option><option value="MEDIUM">Medium priority</option><option value="LOW">Low priority</option></select>
+          <select [(ngModel)]="sortMode" aria-label="Sort tasks"><option value="UPDATED">Recently updated</option><option value="DUE">Due date</option><option value="PRIORITY">Priority</option><option value="TITLE">Title</option></select>
+          <div class="view-switch" aria-label="Choose task view"><button type="button" [class.active]="viewMode === 'board'" (click)="viewMode = 'board'"><span class="board-view-icon"></span>Board</button><button type="button" [class.active]="viewMode === 'list'" (click)="viewMode = 'list'"><span class="list-view-icon"></span>List</button></div>
+        </section>
+        <div *ngIf="loading" class="loading-state"><span></span><p>Loading your workspace...</p></div>
+        <section *ngIf="!loading && filteredTasks.length === 0" class="empty-state"><div class="empty-illustration" aria-hidden="true"><span></span></div><h2>No matching tasks</h2><p>Adjust your filters or add a task to this workspace.</p><button type="button" class="secondary-button" (click)="clearFilters()">Clear filters</button></section>
+        <div *ngIf="!loading && filteredTasks.length > 0 && viewMode === 'list'" class="table-wrap">
+          <table><thead><tr><th>Task</th><th>Status</th><th>Priority</th><th>Assignee</th><th>Story points</th><th>Due date</th><th><span class="visually-hidden">Actions</span></th></tr></thead><tbody>
+            <tr *ngFor="let task of filteredTasks; trackBy: trackTask"><td><button type="button" class="task-title" (click)="openEdit(task)"><strong>{{ task.title }}</strong><small>{{ task.project }}<span *ngIf="task.tags?.length"> · {{ task.tags?.join(', ') }}</span></small></button></td><td><select class="table-status" [ngModel]="task.status" (ngModelChange)="moveTask(task, $event)" [disabled]="!!task.id && movingTaskIds.has(task.id)" [attr.aria-label]="'Status for ' + task.title"><option value="TODO">To do</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option></select></td><td><span class="priority-label" [class]="task.priority.toLowerCase()"><i></i>{{ priorityLabel(task.priority) }}</span></td><td><span class="person"><i>{{ initials(task.assignee) }}</i>{{ task.assignee }}</span></td><td>{{ task.storyPoints ? task.storyPoints + ' pts' : '—' }}</td><td><span class="date-cell" [class.overdue]="isOverdue(task)">{{ dueLabel(task) }}</span></td><td class="row-actions"><button type="button" title="Edit task" (click)="openEdit(task)">Edit</button><button type="button" class="danger-action" title="Delete task" (click)="confirmDelete(task)">Delete</button></td></tr>
+          </tbody></table>
+        </div>
+        <section *ngIf="!loading && viewMode === 'board'" class="board" aria-label="Kanban board">
+          <div class="board-column" *ngFor="let status of statuses" [class.drag-target]="draggedTaskId" (dragover)="$event.preventDefault()" (drop)="dropTask(status)">
+            <div class="column-heading"><span class="column-dot" [class]="'column-dot ' + status.toLowerCase()"></span><h2>{{ statusLabel(status) }}</h2><small>{{ tasksForStatus(status).length }}</small><button type="button" [attr.aria-label]="'Add task to ' + statusLabel(status)" (click)="createInStatus(status)">+</button></div>
+            <div class="column-empty" *ngIf="tasksForStatus(status).length === 0">Drop a task here</div>
+            <article class="kanban-card" *ngFor="let task of tasksForStatus(status); trackBy: trackTask" [attr.draggable]="task.id && !movingTaskIds.has(task.id) ? 'true' : 'false'" [class.dragging]="draggedTaskId === task.id" [class.updating]="!!task.id && movingTaskIds.has(task.id)" (dragstart)="startDrag(task)" (dragend)="endDrag()">
+              <div class="card-top"><span class="priority-label" [class]="task.priority.toLowerCase()"><i></i>{{ priorityLabel(task.priority) }}</span><span *ngIf="task.storyPoints" class="estimate">{{ task.storyPoints }} pts</span></div>
+              <button type="button" class="card-title" (click)="openEdit(task)">{{ task.title }}</button>
+              <p>{{ task.description || 'No description provided.' }}</p>
+              <div *ngIf="task.tags?.length" class="tag-list"><span *ngFor="let tag of task.tags">{{ tag }}</span></div>
+              <span class="card-project">{{ task.project }}</span>
+              <footer><span class="person-mini"><i>{{ initials(task.assignee) }}</i>{{ task.assignee }}</span><time [class.overdue]="isOverdue(task)">{{ dueLabel(task) }}</time></footer>
+              <select class="mobile-move" [ngModel]="task.status" (ngModelChange)="moveTask(task, $event)" [disabled]="!!task.id && movingTaskIds.has(task.id)" [attr.aria-label]="'Move ' + task.title"><option value="TODO">Move to: To do</option><option value="IN_PROGRESS">Move to: In progress</option><option value="DONE">Move to: Done</option></select>
+            </article>
+            <button type="button" class="add-column-task" (click)="createInStatus(status)">+ Add task</button>
+          </div>
+        </section>
+      </ng-container>
+
+      <ng-container *ngIf="activeSection === 'admin' && isAdmin">
+        <section class="access-summary" aria-label="Access summary"><article><span>Total members</span><strong>{{ users.length }}</strong></article><article><span>Administrators</span><strong>{{ adminCount }}</strong></article><article><span>Disabled</span><strong>{{ disabledUserCount }}</strong></article></section>
+        <section class="access-panel">
+          <header><div><p class="eyebrow">Workspace members</p><h2>Manage access</h2></div><button type="button" class="secondary-button" (click)="loadUsers()">Refresh</button></header>
+          <div *ngIf="usersLoading" class="access-loading">Loading members...</div>
+          <div *ngIf="!usersLoading" class="access-table-wrap"><table class="access-table"><thead><tr><th>Member</th><th>Role</th><th>Status</th><th>Joined</th></tr></thead><tbody><tr *ngFor="let user of users; trackBy: trackUser"><td><span class="member-cell"><i>{{ initials(user.fullName) }}</i><span><strong>{{ user.fullName }}</strong><small>{{ user.email }}</small></span><em *ngIf="user.id === currentUser.id">You</em></span></td><td><select [ngModel]="user.role" (ngModelChange)="updateUserRole(user, $event)" [disabled]="user.id === currentUser.id" [attr.aria-label]="'Role for ' + user.fullName"><option value="USER">Member</option><option value="ADMIN">Admin</option></select></td><td><button type="button" class="access-status" [class.disabled]="!user.enabled" [disabled]="user.id === currentUser.id" (click)="toggleUserEnabled(user)"><i></i>{{ user.enabled ? 'Active' : 'Disabled' }}</button></td><td>{{ user.createdAt | date:'MMM d, y' }}</td></tr></tbody></table></div>
+        </section>
+      </ng-container>
+    </div>
+  </main>
+</div>
+
+<div *ngIf="panelOpen" class="overlay" (click)="closePanel()">
+  <aside class="task-panel" role="dialog" aria-modal="true" aria-labelledby="task-panel-title" (click)="$event.stopPropagation()">
+    <header><div><p class="eyebrow">{{ editingTaskId ? 'Task details' : 'New work item' }}</p><h2 id="task-panel-title">{{ editingTaskId ? 'Edit task' : 'Create a task' }}</h2></div><button type="button" class="close-button" aria-label="Close" (click)="closePanel()">&times;</button></header>
+    <form (ngSubmit)="saveTask()">
+      <label class="full-field"><span>Title</span><input name="title" [(ngModel)]="form.title" maxlength="120" placeholder="What needs to be done?" required></label>
+      <label class="full-field"><span>Description</span><textarea name="description" [(ngModel)]="form.description" rows="4" maxlength="1000" placeholder="Add context, requirements, or a clear outcome"></textarea></label>
+      <div class="field-grid"><label><span>Status</span><select name="status" [(ngModel)]="form.status"><option value="TODO">To do</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option></select></label><label><span>Priority</span><select name="priority" [(ngModel)]="form.priority"><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></label><label><span>Assignee</span><select *ngIf="isAdmin" name="ownerId" [ngModel]="form.ownerId" (ngModelChange)="selectAssignee($event)" required><option value="" disabled>Select a team member</option><option *ngFor="let user of assignableUsers" [value]="user.id">{{ user.fullName }}</option></select><input *ngIf="!isAdmin" name="assignee" [(ngModel)]="form.assignee" readonly required></label><label><span>Due date</span><input name="dueDate" type="date" [(ngModel)]="form.dueDate"></label></div>
+      <label class="full-field"><span>Project</span><input name="project" [(ngModel)]="form.project" placeholder="Project or workstream" required></label>
+      <div class="field-grid planning-fields"><label><span>Story points</span><select name="storyPoints" [(ngModel)]="form.storyPoints"><option [ngValue]="null">Not estimated</option><option *ngFor="let points of [1, 2, 3, 5, 8, 13]" [ngValue]="points">{{ points }} points</option></select></label><label><span>Labels</span><input name="tags" [ngModel]="form.tags?.join(', ')" (ngModelChange)="updateFormTags($event)" maxlength="130" placeholder="Design, launch"></label></div>
+      <footer><button type="button" class="secondary-button" (click)="closePanel()">Cancel</button><button type="submit" class="primary-button" [disabled]="saving">{{ saving ? 'Saving...' : (editingTaskId ? 'Save changes' : 'Create task') }}</button></footer>
+    </form>
+  </aside>
+</div>
+
+<div *ngIf="taskToDelete" class="overlay confirmation-overlay" (click)="taskToDelete = null"><section class="confirmation" role="alertdialog" aria-modal="true" aria-labelledby="delete-title" (click)="$event.stopPropagation()"><span class="warning-mark">!</span><h2 id="delete-title">Delete this task?</h2><p><strong>{{ taskToDelete.title }}</strong> will be permanently removed from the workspace.</p><footer><button type="button" class="secondary-button" (click)="taskToDelete = null">Cancel</button><button type="button" class="delete-button" (click)="deleteTask()">Delete task</button></footer></section></div>
+<div *ngIf="toastMessage" class="toast" role="status">{{ toastMessage }}</div>
